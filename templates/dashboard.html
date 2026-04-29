@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ApplyPilot</title>
+    <link rel="icon" href="{{ url_for('static', path='icon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">AP</div>
+          <div>
+            <h1>ApplyPilot</h1>
+            <p>Python dashboard for resume matching, optimization, and application tracking</p>
+          </div>
+        </div>
+        <div class="pill">Python-only MVP</div>
+      </header>
+
+      {% if notice %}
+        <div class="notice">{{ notice }}</div>
+      {% endif %}
+
+      <section class="metrics">
+        <article><strong>{{ resumes|length }}</strong><span>Resumes</span></article>
+        <article><strong>{{ optimized_count }}</strong><span>Versions</span></article>
+        <article><strong>{{ applications|length }}</strong><span>Applications</span></article>
+        <article><strong>{{ best_score }}</strong><span>Best match</span></article>
+      </section>
+
+      <section class="grid">
+        <article class="panel span-5">
+          <div class="panel-head"><h2>Uploaded Resumes</h2><span>{{ resumes|length }}</span></div>
+          <form class="upload" action="/resumes" method="post" enctype="multipart/form-data">
+            <input type="file" name="files" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple required>
+            <button type="submit">Upload PDF or DOCX</button>
+          </form>
+
+          <div class="list">
+            {% if resumes %}
+              {% for resume in resumes %}
+                <div class="resume-row">
+                  <div>
+                    <strong>{{ resume.original_name }}</strong>
+                    <p>
+                      <span class="tag">{{ resume.kind }}</span>
+                      <span>{{ resume.size|bytes }}</span>
+                      <span>v{{ resume.version }}</span>
+                    </p>
+                  </div>
+                  <div class="actions">
+                    <a href="/resumes/{{ resume.id }}/preview" target="_blank">Preview</a>
+                    <a href="/resumes/{{ resume.id }}/download">Download</a>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty">No resumes yet</div>
+            {% endif %}
+          </div>
+        </article>
+
+        <article class="panel span-7">
+          <div class="panel-head"><h2>Job Description</h2><span>JD</span></div>
+          <form action="/analyze" method="post" class="form-stack">
+            <textarea name="jd" placeholder="Paste the job description here" required>{{ jd }}</textarea>
+            <div class="two">
+              <input name="job_title" value="{{ job_title }}" placeholder="Job title">
+              <input name="company_name" value="{{ company_name }}" placeholder="Company name">
+            </div>
+            <button class="primary" type="submit">Analyze JD</button>
+          </form>
+        </article>
+
+        <article class="panel span-7">
+          <div class="panel-head"><h2>Match Results</h2><span>{{ matches|length }}</span></div>
+          {% if matches %}
+            <div class="list">
+              {% for match in matches %}
+                <div class="match-card">
+                  <div class="match-top">
+                    <div>
+                      <strong>{{ match.resume_name }}</strong>
+                      <p>Skills {{ match.skills_score }}% · Keywords {{ match.keyword_score }}% · Role {{ match.role_score }}% · Semantic {{ match.semantic_score }}%</p>
+                    </div>
+                    <b>{{ match.score }}%</b>
+                  </div>
+                  <div class="bar"><span style="width: {{ match.score }}%"></span></div>
+                  <p>{{ match.rationale }}</p>
+                  <div class="chips">
+                    {% for keyword in match.matched_keywords[:10] %}
+                      <span>{{ keyword }}</span>
+                    {% endfor %}
+                  </div>
+                  <form action="/optimize" method="post">
+                    <input type="hidden" name="resume_id" value="{{ match.resume_id }}">
+                    <input type="hidden" name="jd" value="{{ jd }}">
+                    <input type="hidden" name="job_title" value="{{ job_title }}">
+                    <input type="hidden" name="company_name" value="{{ company_name }}">
+                    <button type="submit">Optimize This Resume</button>
+                  </form>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty">No match results</div>
+          {% endif %}
+        </article>
+
+        <article class="panel span-5">
+          <div class="panel-head"><h2>AI Career Advisor</h2><span>{% if advice %}1{% else %}0{% endif %}</span></div>
+          {% if advice %}
+            <div class="advice">
+              <div class="decision {{ 'yes' if advice.should_apply else 'no' }}">
+                <span>Should apply</span>
+                <strong>{{ 'YES' if advice.should_apply else 'NO' }}</strong>
+              </div>
+              <p>{{ advice.reasoning }}</p>
+              <div class="bar"><span style="width: {{ advice.growth_potential_score }}%"></span></div>
+              <p><strong>{{ advice.growth_potential_score }}%</strong> growth potential</p>
+              <div class="chips">
+                {% for gap in advice.skill_gap_analysis %}
+                  <span>{{ gap }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          {% else %}
+            <div class="empty">No advice yet</div>
+          {% endif %}
+        </article>
+
+        <article class="panel span-5">
+          <div class="panel-head"><h2>Optimized Resume</h2><span>{% if optimized %}1{% else %}0{% endif %}</span></div>
+          {% if optimized %}
+            <div class="optimized">
+              <strong>{{ optimized.resume.original_name }}</strong>
+              <p>{{ optimized.optimization.summary }}</p>
+              <pre>{{ optimized.optimization.optimized_text }}</pre>
+              <div class="actions wide">
+                <a href="/resumes/{{ optimized.resume.id }}/preview" target="_blank">Preview</a>
+                <a href="/resumes/{{ optimized.resume.id }}/download">Download PDF</a>
+              </div>
+              <div class="poll">
+                <h3>Did you apply to this job?</h3>
+                <form action="/applications" method="post" class="form-stack">
+                  <input type="hidden" name="resume_id" value="{{ optimized.source_resume_id }}">
+                  <input type="hidden" name="optimized_resume_id" value="{{ optimized.resume.id }}">
+                  <input name="job_title" value="{{ job_title }}" placeholder="Job title" required>
+                  <input name="company_name" value="{{ company_name }}" placeholder="Company name" required>
+                  <button class="primary" type="submit">YES, Save Application</button>
+                </form>
+                <form action="/applications/skip" method="post">
+                  <button type="submit">NO</button>
+                </form>
+              </div>
+            </div>
+          {% else %}
+            <div class="empty">No optimized version yet</div>
+          {% endif %}
+        </article>
+
+        <article class="panel span-7">
+          <div class="panel-head"><h2>Application Tracker</h2><span>{{ applications|length }}</span></div>
+          {% if applications %}
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Job Title</th><th>Company</th><th>Date & Time</th><th>Resume Used</th></tr>
+                </thead>
+                <tbody>
+                  {% for app in applications %}
+                    <tr>
+                      <td>{{ app.job_title }}</td>
+                      <td>{{ app.company_name }}</td>
+                      <td>{{ app.applied_at }}</td>
+                      <td>{{ resume_names.get(app.optimized_resume_id or app.resume_id, app.optimized_resume_id or app.resume_id) }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="empty">No applications saved</div>
+          {% endif %}
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

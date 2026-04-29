@@ -1,28 +1,37 @@
 # ApplyPilot
 
-ApplyPilot is a production-shaped MVP for managing job applications with AI. It uploads PDF/DOCX resumes, extracts text, ranks resumes against a pasted job description, generates a one-page optimized PDF version, tracks applications after the user confirms they applied, and provides career advice.
+ApplyPilot is a Python-only MVP for managing and optimizing job applications with AI. It uploads PDF/DOCX resumes, extracts resume text, ranks every resume against a pasted job description, generates a one-page optimized PDF version, asks whether the user applied, tracks applications, and provides career advice.
+
+No Java, JavaScript, TypeScript, React, or Node runtime is required.
 
 ## Stack
 
-- Next.js App Router with API routes
-- React dashboard UI
-- Local JSON database and file storage for development
-- Optional Supabase Postgres and Supabase Storage for deployment
-- OpenAI Responses API for resume optimization and advice when `OPENAI_API_KEY` is set
-- OpenAI embeddings for semantic matching when `OPENAI_API_KEY` is set
-- Deterministic local fallbacks when no AI key is configured
+- Python 3.11+
+- FastAPI
+- Jinja2 server-rendered templates
+- SQLite
+- Plain HTML and CSS
+- ReportLab for optimized one-page PDF generation
+- pypdf and python-docx for resume text extraction
+- Optional OpenAI API calls through Python `requests`
 
 ## Local Setup
 
 ```bash
-npm install
-cp .env.example .env.local
-npm run dev
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn app.main:app --reload
 ```
 
-Open `http://localhost:3000`.
+Open `http://127.0.0.1:8000`.
 
-Without Supabase variables, resumes and applications are stored in `.data/`. Without an OpenAI key, matching, advice, and optimization still work with local keyword and cosine-similarity logic.
+On macOS or Linux, activate the virtual environment with:
+
+```bash
+source .venv/bin/activate
+```
 
 ## Environment Variables
 
@@ -30,30 +39,38 @@ Without Supabase variables, resumes and applications are stored in `.data/`. Wit
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.2
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_BUCKET=resumes
+APP_DATABASE_PATH=.data/applypilot.sqlite3
+APP_STORAGE_DIR=.data/storage
 ```
 
-The default OpenAI text model follows the OpenAI Models documentation current at implementation time, where GPT-5.2 is listed as the featured frontier model. The app uses the Responses API because OpenAI positions it as the current interface for new model responses.
+If `OPENAI_API_KEY` is not set, ApplyPilot still works with local keyword extraction, TF-style cosine scoring, heuristic resume optimization, and deterministic career advice.
 
-## Supabase Setup
+## Features
 
-1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the SQL editor.
-3. Create a private Storage bucket named `resumes`.
-4. Add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_BUCKET=resumes` to `.env.local` and to Vercel.
+- Upload multiple PDF/DOCX resumes
+- Store resumes in SQLite and local file storage
+- Preview and download each resume
+- Paste a job description
+- Rank resumes by keyword, skills, role relevance, and optional embeddings
+- Generate an optimized one-page PDF resume
+- Save optimized versions as resume history
+- Ask whether the user applied
+- Track job title, company, date/time, and resume used
+- Show AI career advice with apply recommendation, reasoning, growth potential, and skill gaps
+- Mobile-first dashboard layout
 
-## Deploy to Vercel
+## Deployment
 
-1. Push this project to GitHub.
-2. Import it in Vercel as a Next.js project.
-3. Add the environment variables above.
-4. Deploy.
+This app can be deployed on Python-friendly hosts such as Render, Railway, Fly.io, or a VPS.
 
-For real production usage, use Supabase mode. The local `.data/` fallback is intended for development and demos because serverless file systems are ephemeral.
+Typical start command:
 
-## Resume Optimization Notes
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
 
-The optimizer enforces text-only edits, ATS-friendly wording, and a one-page PDF output. For arbitrary uploaded PDFs, exact binary-level font/layout preservation is not generally possible from extracted text alone. In production, pair this workflow with editable DOCX templates or a document rendering service if exact source typography must be guaranteed across every resume format.
+For production, attach persistent disk storage for `.data/` or point `APP_DATABASE_PATH` and `APP_STORAGE_DIR` to a mounted volume.
+
+## Resume Optimization Note
+
+The optimizer edits extracted resume text and generates a new one-page PDF. It preserves the logical structure and keeps the output ATS-friendly. Exact binary-level preservation of arbitrary uploaded PDF/DOCX typography is not guaranteed without a dedicated document editing engine, but the generated version is constrained to a clean one-page resume.
