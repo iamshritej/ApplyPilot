@@ -1,0 +1,12 @@
+.next
+node_modules
+out
+.env*.local
+.env
+.data
+.chrome-profile*
+.chrome-cdp*
+.data-dev-server.*
+applypilot-*.png
+*.tsbuildinfo
+.vercel
